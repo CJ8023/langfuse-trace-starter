@@ -61,6 +61,17 @@ public class PromptRecordingConvention extends DefaultChatModelConvention {
         return kvs;
     }
 
+    @Override
+    public String getContextualName(ChatModelObservationContext context) {
+        // 内部调用（记忆压缩摘要等）：span 名 = 调用原因（如 summary），非默认 chat {model}，
+        // Langfuse 中一眼可辨内部调用与普通生成
+        String reason = internalReason();
+        if (reason != null) {
+            return reason;
+        }
+        return super.getContextualName(context);
+    }
+
     /**
      * 模型请求参数 → {@code gen_ai.request.*}（Langfuse 详情 modelParameters）。
      * 模型会把默认参数（如 openai profile 的 temperature=0.1）merge 进请求再触发 listener，
@@ -122,6 +133,10 @@ public class PromptRecordingConvention extends DefaultChatModelConvention {
     /** 详情走结构化 gen_ai.*，trace 列表列走纯文本 langfuse.trace.*（不写 langfuse.observation.input/output） */
     private KeyValues appendLangfuse(KeyValues kvs, ChatModelObservationContext context) {
         kvs = kvs.and("langfuse.observation.type", "generation");
+        // 内部 LLM 调用（记忆压缩摘要等）：仍写 gen_ai.prompt/completion（trace 详情可见），
+        // 但不写 langfuse.trace.*——避免内部调用作为最后一条 generation 覆盖请求 trace 的
+        // 列表列（name/input/output）
+        boolean internal = internalReason() != null;
 
         List<ChatMessage> messages = requestMessages(context);
         if (messages != null) {
@@ -129,17 +144,19 @@ public class PromptRecordingConvention extends DefaultChatModelConvention {
             if (prompt != null) {
                 kvs = kvs.and("gen_ai.prompt", prompt);
             }
-            // 原始 query 优先取 MDC（graph 等场景 LLM prompt 为拼接内容，需用入口 query 覆盖）；
-            // 无则回退从消息里提取用户输入。
-            String mdcInput = MDC.get(LangfuseMdcKeys.LANGKFUSE_INPUT_KEY);
-            String input = (mdcInput != null && !mdcInput.isBlank())
-                    ? mdcInput : extractUserInput(messages);
-            if (input != null) {
-                kvs = kvs.and("langfuse.trace.input", input);
+            if (!internal) {
+                // 原始 query 优先取 MDC（graph 等场景 LLM prompt 为拼接内容，需用入口 query 覆盖）；
+                // 无则回退从消息里提取用户输入。
+                String mdcInput = MDC.get(LangfuseMdcKeys.LANGKFUSE_INPUT_KEY);
+                String input = (mdcInput != null && !mdcInput.isBlank())
+                        ? mdcInput : extractUserInput(messages);
+                if (input != null) {
+                    kvs = kvs.and("langfuse.trace.input", input);
+                }
+                ChatModelRequestContext req = context.getRequestContext();
+                String model = req == null || req.chatRequest() == null ? null : req.chatRequest().modelName();
+                kvs = kvs.and("langfuse.trace.name", traceName(model));
             }
-            ChatModelRequestContext req = context.getRequestContext();
-            String model = req == null || req.chatRequest() == null ? null : req.chatRequest().modelName();
-            kvs = kvs.and("langfuse.trace.name", traceName(model));
         }
 
         ChatModelResponseContext resp = context.getResponseContext();
@@ -149,12 +166,20 @@ public class PromptRecordingConvention extends DefaultChatModelConvention {
             if (completion != null) {
                 kvs = kvs.and("gen_ai.completion", completion);
             }
-            String text = ai.text();
-            if (text != null && !text.isBlank()) {
-                kvs = kvs.and("langfuse.trace.output", text);
+            if (!internal) {
+                String text = ai.text();
+                if (text != null && !text.isBlank()) {
+                    kvs = kvs.and("langfuse.trace.output", text);
+                }
             }
         }
         return kvs;
+    }
+
+    /** MDC 内部观测标记值：内部 LLM 调用原因（记忆压缩摘要="summary"）；null/空 = 非内部调用 */
+    private static String internalReason() {
+        String reason = MDC.get(LangfuseMdcKeys.INTERNAL_OBSERVATION_KEY);
+        return (reason == null || reason.isBlank()) ? null : reason;
     }
 
     /**

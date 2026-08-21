@@ -24,6 +24,10 @@ public final class LangfuseMdcKeys {
     /** MDC 键：本次请求使用的 Langfuse 提示词版本（PromptRecordingChatModelListener 读，写 OTel 数值 span 属性） */
     public static final String LANGKFUSE_PROMPT_VERSION_KEY = "langfuse.prompt.version";
 
+    /** MDC 键：内部 LLM 调用标记——值 = 调用原因（记忆压缩摘要 "summary" 等）。convention 据此：
+     *  span 名 = 原因、不写 trace 列表列（langfuse.trace.*）、gen_ai 详情保留。null/空 = 非内部调用 */
+    public static final String INTERNAL_OBSERVATION_KEY = "langfuse.internal-observation";
+
     private LangfuseMdcKeys() {
     }
 }
