@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.16</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.cj</groupId>
+    <artifactId>langfuse-trace-spring-boot-starter</artifactId>
+    <version>1.0.0</version>
+    <name>langfuse-trace-spring-boot-starter</name>
+    <description>Langchain4j 1.18.1 / Spring Boot 3.5.x 的 OTel-Langfuse 追踪 starter：HTTP trace + LLM/tool/retrieval 观测 + 跨线程 trace 传播 + 图节点观测</description>
+
+    <properties>
+        <!-- 基础版本要求（显式标注，便于迁移到同版本项目） -->
+        <java.version>17</java.version>
+        <!-- 与 parent spring-boot-starter-parent 版本一致，供 Spring Boot 系依赖显式标注 -->
+        <spring-boot.version>3.5.16</spring-boot.version>
+        <!-- langchain4j：模型观测/会话链路版本基线 -->
+        <langchain4j.version>1.18.1</langchain4j.version>
+        <!-- langgraph4j：与 langchain4j 1.18.1 精确匹配的图编排版本基线 -->
+        <langgraph4j.version>1.8.24</langgraph4j.version>
+        <!-- OpenTelemetry：与 Spring Boot 3.5.16 BOM 管理的版本对齐（OTLP 导出器） -->
+        <opentelemetry.version>1.49.0</opentelemetry.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-bom</artifactId>
+                <version>${langchain4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.bsc.langgraph4j</groupId>
+                <artifactId>langgraph4j-bom</artifactId>
+                <version>${langgraph4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Spring Boot 基础（版本由 parent 3.5.16 管理） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <!-- WebFlux：HTTP observation（ServerRequestObservationContext）/ WebFilter / Reactor context -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <!-- Actuator：management.otlp.tracing.export.* 配置生效 + health 端点支撑（显式版本） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <version>${spring-boot.version}</version>
+        </dependency>
+
+        <!-- 观测核心：micrometer Observation + OTel bridge（traceId/MDC/gen_ai span） -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <!-- OTel OTLP 导出器：trace 上报到 Langfuse OTLP endpoint（显式版本，与 Spring Boot 3.5.16 BOM 对齐） -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+            <version>${opentelemetry.version}</version>
+        </dependency>
+        <!-- 直接依赖：starter 源码 import 了 io.opentelemetry.api.trace.*（opentelemetry-api）
+             与 io.opentelemetry.context.*（opentelemetry-context），
+             必须显式声明，避免只靠 micrometer-tracing-bridge-otel 的深层传递链（缺失会导致 NoClassDefFoundError） -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <version>${opentelemetry.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-context</artifactId>
+            <version>${opentelemetry.version}</version>
+        </dependency>
+
+        <!-- langchain4j 观测：ChatModelListener / ChatModelObservationContext / convention（版本 1.18.1） -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-observation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-core</artifactId>
+        </dependency>
+
+        <!-- langgraph4j：图节点 trace 传播（可选——目标项目未用图编排时自动不生效，版本 1.8.24） -->
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- 配置元数据生成（IDE 提示 langfuse.trace.* 属性） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试：JUnit 5 / AssertJ / Mockito / reactor-test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

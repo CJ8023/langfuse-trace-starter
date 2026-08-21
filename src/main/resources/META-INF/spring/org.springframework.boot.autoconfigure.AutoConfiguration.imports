@@ -1,0 +1,2 @@
+com.langfuse.trace.LangfuseTraceAutoConfiguration
+com.langfuse.trace.LangChain4jStreamingExecutorConfig
