@@ -13,7 +13,7 @@
 
     <groupId>com.cj</groupId>
     <artifactId>langfuse-trace-spring-boot-starter</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
     <name>langfuse-trace-spring-boot-starter</name>
     <description>Langchain4j 1.18.1 / Spring Boot 3.5.x 的 OTel-Langfuse 追踪 starter：HTTP trace + LLM/tool/retrieval 观测 + 跨线程 trace 传播 + 图节点观测</description>
 
