@@ -1,7 +1,7 @@
 # langfuse-trace-spring-boot-starter
 
 Langchain4j 应用接入 [Langfuse](https://langfuse.com)（LLM 可观测平台）的 **Spring Boot Starter**。
-从 `release-langchain4j-ddd-service` 的 `shared.observation` 包抽取、解耦后封装为独立组件，
+从 `langchain4j-ddd-service` 的 `shared.observation` 包抽取、解耦后封装为独立组件，
 **开箱即用、可整体迁移到相同版本基线（Spring Boot 3.5.x / langchain4j 1.18.1 / langgraph4j 1.8.24）的其他项目**。
 
 - 坐标：`com.cj:langfuse-trace-spring-boot-starter:1.0.0`
